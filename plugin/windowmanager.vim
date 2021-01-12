@@ -27,7 +27,7 @@ function! DeleteWin()
 	call windowmanager#exec(2)
 endfunction
 
-function! SwapAndStay()
+function! SwapAndFollow()
 	call windowmanager#exec(3)
 endfunction
 
@@ -97,11 +97,12 @@ function! windowmanager#exec(swap) abort
 			let marked_line = line(".")
 			let marked_col = col(".")
 			exe 'hide buf' curr_buff
-			if a:swap ==# 1
-				exe curr_num . "wincmd w"
-			endif
+			exe curr_num . "wincmd w"
 			call cursor(curr_line, curr_col)	
 			exe 'hide buf' marked_buf
+			if a:swap ==# 3
+				exe select_winnr . "wincmd w"
+			endif
 		elseif a:swap ==# 2
 			let marked_buf = bufnr("%")
 			exe 'bdelete' marked_buf
@@ -111,6 +112,6 @@ function! windowmanager#exec(swap) abort
 endfunction
 
 command! -n=0 -bar WMSwap :call SwapWin()
-command! -n=0 -bar WMSwapAndStay :call SwapAndStay()
+command! -n=0 -bar WMSwapAndFollow :call SwapAndFollow()
 command! -n=0 -bar WMNav :call NavWin()
 command! -n=0 -bar WMDelete :call DeleteWin()
