@@ -71,11 +71,11 @@ function! windowmanager#exec(swap) abort
 		let select_winnr = -1
 		while 1
 			if a:swap ==# 1
-				call s:echo_msg('Select buffer to swap with')
+				call s:echo_msg('Select window to swap with')
 			elseif a:swap ==# 0
-				call s:echo_msg('Select buffer to move to')
+				call s:echo_msg('Select window to move to')
 			else
-				call s:echo_msg('Select buffer to close')
+				call s:echo_msg('Select window to close')
 			endif
 
 			let nr = getchar()
