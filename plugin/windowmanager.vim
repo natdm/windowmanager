@@ -6,6 +6,7 @@ let s:select_wins_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
 " add other colors from :so $VIMRUNTIME/syntax/hitest.vim as desired
 let g:windowmanager_color = "Search"
+let g:windowmanager_selected_color = "DiffText"
 
 function! s:restore_statuslines(store) abort
 	for winnr in keys(a:store)
@@ -23,20 +24,32 @@ function! s:echo_msg(msg) abort
 	echohl None
 endfunction
 
+" action constants for readability
+let s:action_nav = 0
+let s:action_swap = 1
+let s:action_delete = 2
+let s:action_swap_follow = 3
+let s:action_move_below = 4
+
 function! DeleteWin()
-	call windowmanager#exec(2)
+	call windowmanager#exec(s:action_delete)
 endfunction
 
 function! SwapAndFollow()
-	call windowmanager#exec(3)
+	call windowmanager#exec(s:action_swap_follow)
 endfunction
 
 function! SwapWin()
-	call windowmanager#exec(1)
+	call windowmanager#exec(s:action_swap)
 endfunction
 
 function! NavWin()
-	call windowmanager#exec(0)
+	call windowmanager#exec(s:action_nav)
+endfunction
+
+function! MoveBelow()
+	call windowmanager#exec(s:action_move_below)
+
 endfunction
 
 function! windowmanager#exec(swap) abort
@@ -52,9 +65,6 @@ function! windowmanager#exec(swap) abort
 	for winnr in range(1, winnr('$'))
 		let bufnr = winbufnr(winnr)
 		call s:store_statusline(store, winnr)
-		if winnr == curr_num
-			continue
-		endif
 		let char_idx_mapto_winnr[char_idx] = winnr
 		let char = s:select_wins_chars[char_idx]
 		let statusline = printf('%%#%s#%s %s', g:windowmanager_color, repeat(' ', winwidth(winnr)/2-1), char)
@@ -68,11 +78,29 @@ function! windowmanager#exec(swap) abort
 		call s:restore_statuslines(store)
 	else
 		redraw!
-		let select_winnr = -1
+
+		let first_winnr = -1 " first window chosen
 		while 1
-			if a:swap ==# 1
+			call s:echo_msg('Select first window')
+			let nr = getchar()
+			if nr == 27 
+				call s:restore_statuslines(store)
+				return
+			else
+				let first_winnr = get(char_idx_mapto_winnr, string(nr - char2nr('a')), -1)
+				if first_winnr != -1
+					let statusline = printf('%%#%s#%s %s', g:windowmanager_selected_color, repeat(' ', winwidth(first_winnr)/2-1), 'X')
+					call setwinvar(first_winnr, '&statusline', statusline)
+					break
+				endif
+			end
+		endwhile
+
+		let second_winnr = -1
+		while 1
+			if a:swap ==# s:action_swap || a:swap ==# s:action_swap_follow 
 				call s:echo_msg('Select window to swap with')
-			elseif a:swap ==# 0
+			elseif a:swap ==# s:action_nav 
 				call s:echo_msg('Select window to move to')
 			else
 				call s:echo_msg('Select window to close')
@@ -82,30 +110,37 @@ function! windowmanager#exec(swap) abort
 			if nr == 27 "ESC
 				call s:restore_statuslines(store)
 				return
+			elseif nr ==# first_winnr
+				call s:restore_statuslines(store)
+				return
 			else
-				let select_winnr = get(char_idx_mapto_winnr, string(nr - char2nr('a')), -1)
-				if select_winnr != -1
+				let second_winnr = get(char_idx_mapto_winnr, string(nr - char2nr('a')), -1)
+				if second_winnr != -1
 					break
 				endif
 			endif
 		endwhile
 		call s:restore_statuslines(store)
 		" move to selected window
-		exe select_winnr . "wincmd w" 
-		if a:swap ==# 1 || a:swap ==# 3
+		exe second_winnr . "wincmd w" 
+		if a:swap ==# s:action_swap || a:swap ==# s:action_swap_follow 
 			let marked_buf = bufnr("%")
 			let marked_line = line(".")
 			let marked_col = col(".")
-			exe 'hide buf' curr_buff
-			exe curr_num . "wincmd w"
+			"need to get the buffer from the selected window,
+			"looks like I can use winbufnr?
+			exe 'hide buf' winbufnr(first_winnr)
+			exe first_winnr . "wincmd w"
 			call cursor(curr_line, curr_col)	
 			exe 'hide buf' marked_buf
-			if a:swap ==# 3
-				exe select_winnr . "wincmd w"
+			if a:swap ==# s:action_swap_follow 
+				exe second_winnr . "wincmd w"
 			endif
-		elseif a:swap ==# 2
+		elseif a:swap ==# s:action_delete 
 			let marked_buf = bufnr("%")
 			exe 'bdelete' marked_buf
+		elseif a:swap ==# s:action_move_below
+			echon 'moving below ' . marked_buf
 		endif
 		echon 'Done'
 	endif
@@ -115,3 +150,4 @@ command! -n=0 -bar WMSwap :call SwapWin()
 command! -n=0 -bar WMSwapAndFollow :call SwapAndFollow()
 command! -n=0 -bar WMNav :call NavWin()
 command! -n=0 -bar WMDelete :call DeleteWin()
+command! -n=0 -bar WMMoveBelow :call MoveBelow()
